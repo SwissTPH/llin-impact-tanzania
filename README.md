@@ -1,5 +1,5 @@
 # llin-impact-tanzania
-R scripts for retrospective impact evaluation of LLINs using routine surveillance data and interrupted time series analysis. This repository contains the R code used to reproduce the analyses presented in the manuscript: 
+R scripts for retrospective impact evaluation of LLINs using routine surveillance data and interrupted time series analysis. This repository contains the R code used to reproduce the analyses presented in the manuscript:  
 > **Using Routine Health Facility Data to Evaluate the Retrospective Impact of Long-Lasting Insecticidal Nets in Mainland Tanzania**
 
 ## Overview
