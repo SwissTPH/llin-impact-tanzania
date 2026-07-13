@@ -101,11 +101,9 @@ For questions regarding the analysis or repository, please contact:
 
 
 **Sumaiyya G. Thawer**  
-Swiss Tropical and Public Health Institute
-Allschwil, Switzerland
+Swiss Tropical and Public Health Institute, Allschwil, Switzerland
 
 or
  
 **Monica Golumbeanu**  
-Swiss Tropical and Public Health Institute  
-Allschwil, Switzerland
+Swiss Tropical and Public Health Institute, Allschwil, Switzerland
