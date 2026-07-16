@@ -1,6 +1,6 @@
-############################################################################
-# Fit ARIMA Model for various covariate combination and save best model 
-############################################################################
+###################################################################################################################
+# Fit ARIMA Model with auto.arima function for various covariate combination and save best model with lowest AICc
+###################################################################################################################
 
 packages= c("zoo","forecast", "leaps", "dplyr", "xlsx", "openxlsx", "readxl", "tidyverse", "ggplot2", "cowplot", "tidyr", "reshape","lubridate")
 
@@ -8,7 +8,7 @@ pacman::p_load(packages, character.only = T)
 
 
 # Import dataset
-input_data <- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\impact_analysis_inputdata.xlsx")
+input_data <- read_excel("filepath\\impact_analysis_inputdata.xlsx")
 
 #function to fit model using auto.arima
 fit_auto_arima_with_exog = function(ts_var, exog_vars, merged_df) {
@@ -21,10 +21,9 @@ fit_auto_arima_with_exog = function(ts_var, exog_vars, merged_df) {
 
 District_list = unique(input_data$District)
 
-
 for(district_idx in seq_along(District_list)) {
-district_idx=1 #running code for one district Bahi
-result_folder = "C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results"
+
+result_folder = "filepath\\Results"
 result_file_aic <- paste0(result_folder, "\\AICc\\", District_list[district_idx], "_AIC.csv")
 result_file_model_ITN = paste0(result_folder, "/Model/", District_list[district_idx], "_best_model_with_ITN.rds")
 
@@ -179,7 +178,7 @@ colnames_cov = c(colnames_cov, covariate_name_NDVI,covariate_name_Temperature,co
 
 colnames(merged_covariates) = colnames_cov
 
-# Just checking the series
+# Checking the series
 autoplot(merged_covariates)
 
 exogenous_vars = colnames_cov[2:length(colnames_cov)]
@@ -218,7 +217,7 @@ for (j in seq_along(exog_combinations)) { #seq_along(exog_combinations)
                                     District=District_list[district_idx]))
   
   #if you want to save all model combinations for further analysis
-  #output_folder="C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\Model_combinations"
+  #output_folder="filepath\\Model_combinations"
   #model_filename <- file.path(output_folder, paste0("model_", j, District_list[district_idx], ".rds"))
   #saveRDS(model[[j]], model_filename)
 }
@@ -226,7 +225,7 @@ for (j in seq_along(exog_combinations)) { #seq_along(exog_combinations)
 # Write data frame with AIC values for the fitted models for the given district to file
 write.csv(aic_df, result_file_aic)
 
-#Save best model forcing ITN access as covariate based on lowest AICc in rds
+#Save best model ensuring ITN access is always included as a covariate based on lowest AICc 
 aic_df_with_ITN = aic_df %>% filter(grepl("ITN_access", Exogenous_Variables))
 
 aic_df_with_ITN$Exogenous_Variables<-as.character(aic_df_with_ITN$Exogenous_Variables)
