@@ -6,7 +6,7 @@ R scripts for retrospective impact evaluation of LLINs using routine surveillanc
 
 This study retrospectively evaluates the epidemiological impact of the 2020 long-lasting insecticidal net (LLIN) mass distribution campaign in mainland Tanzania using routine health facility surveillance data.
 
-The analysis applies interrupted time series methods using dynamic regression models with ARIMA errors to estimate the counterfactual malaria incidence that would have been expected in the absence of the campaign. The difference between the observed and predicted incidence is used to estimate the number and proportion of malaria cases averted.
+The analysis applies interrupted time series methods using dynamic regression models with ARIMA errors to estimate the counterfactual malaria incidence that would have been expected in the absence of the campaign. The difference between the observed and predicted incidence is used to estimate the number and proportion of malaria cases/1,000 population averted.
 
 Analyses were conducted independently for each council using routinely collected surveillance data together with environmental and health system covariates.
 
@@ -15,15 +15,13 @@ Analyses were conducted independently for each council using routinely collected
 The analyses use multiple data sources including:
 
 - Routine malaria surveillance data from the Tanzania DHIS2/Health Management Information System (HMIS)
-- Council-level ITN access estimates
+- Council-level ITN access estimates (https://pubmed.ncbi.nlm.nih.gov/36604693/)
 - CHIRPS rainfall data
 - MODIS NDVI
 - Landsat-derived land surface temperature
-- Health facility reporting completeness indicators
+- Health facility reporting completeness indicator
 
-Access to these data requires permission from the National Malaria Control Programme (NMCP), Ministry of Health, Tanzania.
-
-Because of data sharing restrictions, this repository does not contain the raw surveillance data.
+Data from routine HMIS/DHIS2 are not publicly available and were obtained with request from the National Malaria Control Programme of mainland Tanzania. Restrictions apply to the availability of these data and permission can be obtained with reasonable request from the Ministry of Health of mainland Tanzania. Therefore, this repository does not contain the raw surveillance data.
 
 ## Analysis workflow
 
@@ -33,12 +31,14 @@ The analytical workflow consists of the following steps:
 2. Aggregation of health facility data to council level
 3. Assembly of environmental and health system covariates
 4. Selection of lagged covariates using cross-correlation analysis
-5. ARIMA model fitting for the pre-intervention period
-6. Counterfactual forecasting assuming no LLIN campaign
-7. Estimation of:
-   - percentage of malaria cases averted
-   - absolute reduction in malaria incidence
-8. Generation of manuscript figures and tables
+5. ARIMA model fitting for the pre-intervention period using auto.arima function
+6. Checking the model orders and residuals and updating the orders where necessary
+7. ARIMA model fitting using revised orders
+8. Counterfactual forecasting assuming no LLIN campaign
+10. Estimation of:
+   - percentage of malaria cases/1000 population averted
+   - absolute reduction in malaria incidence/1000 population
+11. Generation of manuscript figures and tables
 
 ## Statistical methods
 
@@ -51,7 +51,7 @@ The models account for:
 - long-term trends
 - environmental covariates
 - reporting indicators
-- ITN access
+- LLIN access
 
 Model adequacy was assessed using:
 
