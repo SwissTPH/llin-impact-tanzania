@@ -1,6 +1,6 @@
-############################################################################
-# Fit ARIMA Model for various covariate combination and save best model 
-############################################################################
+###############################################################################################################################################
+# Fit ARIMA Model for various covariate combination and save best model with lowest AICc using revised orders defined from ACF and PACF plots
+################################################################################################################################################
 
 packages= c("zoo","forecast", "leaps", "dplyr", "xlsx", "openxlsx", "readxl", "tidyverse", "ggplot2", "cowplot", "tidyr", "reshape","lubridate")
 
@@ -8,9 +8,9 @@ pacman::p_load(packages, character.only = T)
 
 
 # Import dataset
-manual_order <- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\manual_orders.xlsx")
+manual_order <- read_excel("filepath\\manual_orders.xlsx")
 
-input_data <- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\impact_analysis_inputdata.xlsx")
+input_data <- read_excel("filepath\\impact_analysis_inputdata.xlsx")
 
 
 #function to fit model with manual orders--> adjusted orders from auto.arima through inspection of ACF and PACF plots
@@ -31,14 +31,14 @@ District_list = unique(input_data$District)
 
 for(district_idx in seq_along(District_list)) {
 district_idx=1 #running code for one district Bahi
-result_folder = "C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results"
+result_folder = "filepath\\Results"
 result_file_aic <- paste0(result_folder, "\\AICc\\", District_list[district_idx], "_AIC.csv")
 result_file_model_ITN = paste0(result_folder, "/Model/", District_list[district_idx], "_best_model_with_ITN.rds")
 
 # Subset the data for the current distrcit
 data = input_data %>% dplyr::filter( District == District_list[district_idx] )
 
-#specif the manual orders to be used for model fit--> This step comes after using orders from auto.arima function
+#specif the manual orders to be used for model fit--> This step comes after revising orders obtained from auto.arima function
 orders = manual_order %>% dplyr::filter( District == District_list[district_idx] )
 
 p=orders$newp
@@ -197,7 +197,7 @@ colnames_cov = c(colnames_cov, covariate_name_NDVI,covariate_name_Temperature,co
 
 colnames(merged_covariates) = colnames_cov
 
-# Just checking the series
+# Checking the series
 autoplot(merged_covariates)
 
 exogenous_vars = colnames_cov[2:length(colnames_cov)]
@@ -234,7 +234,7 @@ for (j in seq_along(exog_combinations)) { #seq_along(exog_combinations)
                                     Exogenous_Variables = exog_vars, 
                                     District=District_list[district_idx]))
   #if you want to save all model combinations for further analysis
-  #output_folder="C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\Model_combinations"
+  #output_folder="filepath\\Model_combinations"
   #model_filename <- file.path(output_folder, paste0("model_", j, District_list[district_idx], ".rds"))
   #saveRDS(model[[j]], model_filename)
 
