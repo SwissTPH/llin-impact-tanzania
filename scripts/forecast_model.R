@@ -1,5 +1,5 @@
 ###########################################################
-#Forecast counterfactual for best_model
+#Forecast counterfactual for selected models
 #############################################################
 
 packages= c("tseries","ggpubr","zoo","forecast", "leaps", "dplyr", "xlsx", "openxlsx", "readxl", "tidyverse", "ggplot2", "cowplot", "tidyr", "reshape","lubridate","vroom","reshape2")
@@ -7,19 +7,14 @@ packages= c("tseries","ggpubr","zoo","forecast", "leaps", "dplyr", "xlsx", "open
 pacman::p_load(packages, character.only = T)
 
 #Import data and best model
-input_data <- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\impact_analysis_inputdata.xlsx")
+input_data <- read_excel("filepath\\impact_analysis_inputdata.xlsx")
 
-setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes")
-
-###########################################
-#for all best models produce forecast plots
-###########################################
-result_folder = "C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results"
+result_folder = "filepath\\Results"
 
 # Function to import the model for a specific district name
 import_model_by_district <- function(district_name) {
   # Construct the file path for the RDS file based on the district name
-  file_path <- paste0("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\Model\\", District_list[district_idx], "_best_model_with_ITN.rds")
+  file_path <- paste0("filepath\\Model\\", District_list[district_idx], "_best_model_with_ITN.rds")
    
   # Load the model from the RDS file
   model <- readRDS(file_path)
@@ -28,6 +23,9 @@ import_model_by_district <- function(district_name) {
   return(model)
 }
 
+#---------------------------------------
+#forecast
+#---------------------------------------
 District_list = unique(input_data$District)
 
 coeff_list <- list()
@@ -37,21 +35,21 @@ merged_list <- list()
 alpha <- 0.05 
 
 for(district_idx in seq_along(District_list)) {
-  district_idx=1 #running code for one district Bahi
+
   # Result file
   result_file = paste0(result_folder,"\\Forecast_result\\", District_list[district_idx], "_forecast.csv")
   
   best_model_with_ITN <- import_model_by_district(District_list[district_idx])
   
-  
-  setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\residual_plots")
+  #Residual plots
+  setwd("filepath\\Results\\residual_plots")
   png(paste0(District_list[district_idx],"residuals_combined.png"))
   checkresiduals(best_model_with_ITN)
   dev.off()
   
   # Extract coefficients and their standard errors directly from the model
   coefficients <- coef(best_model_with_ITN)
-  std_errors <-  sqrt(diag(vcov(best_model_with_ITN))) # Standard errors directly from the model
+  std_errors <-  sqrt(diag(vcov(best_model_with_ITN))) 
   
   # Compute the t-statistic
   t_stats <- coefficients / std_errors
@@ -86,7 +84,7 @@ for(district_idx in seq_along(District_list)) {
   # Extract p-value
   Ljungpvalue<- lb_test$p.value
 
-  #data procees
+  #data processing
   data = input_data %>% dplyr::filter(District == District_list[district_idx])
   
   data$date<-as.Date(data$date)
@@ -114,7 +112,7 @@ for(district_idx in seq_along(District_list)) {
       Rainfall_lag5 = lag(Rainfall, 5)
       
     )
-  
+  #define the period
   start_date = min(data$date)
   startY <- as.numeric(format(start_date,'%Y'))
   startM <- as.numeric(format(start_date," %m"))
@@ -137,20 +135,20 @@ for(district_idx in seq_along(District_list)) {
   
   #rename columns in lagged_df to match covariate names saved in model
   data<-data %>% 
-    dplyr::rename("ITN_access"="ITNaccess_hillsteady" )
+    dplyr::rename("ITN_access"="ITNaccess_hillsteady" ) #for forecasting counterfactual, LLIN access was fixed at its pre-intervention level using a hill decay function
 
   #convert to time series object
   ts_incidence = ts(log(data$incidence), start=c(startY,startM), 
                 end=c(yearbeforedeployment, monthbeforedeployment), frequency = 12)
   
   autoplot(ts_incidence)
-  
+
+  #decompose the data
   mergedcomponents <- decompose(ts_incidence,filter = rep(1/12, 12))
   trend = mergedcomponents$trend
   
-  setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\Decomposition_plots")
+  setwd("filepath\\Results\\Decomposition_plots")
   png(paste0(District_list[district_idx],".png"))
-  
   plot(mergedcomponents)+title((main = paste(District_list[district_idx],"(",p,d,q,")","(",P,D,Q,")")))
   dev.off()
   
@@ -161,12 +159,11 @@ for(district_idx in seq_along(District_list)) {
     ts_to_plot <- ts_incidence
   }
   
- 
   # Generate ACF and PACF plots
   acf_plot <- ggAcf(ts_to_plot) + ggtitle(paste("ACF for", District_list[district_idx]))
   pacf_plot <- ggPacf(ts_to_plot) + ggtitle(paste("PACF for", District_list[district_idx]))
   
-  setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\ACF_PACF_plots")
+  setwd("filepath\\Results\\ACF_PACF_plots")
   
   # Combine and save plots
   combined_plot <- ggarrange(acf_plot, pacf_plot, ncol = 2, nrow = 1)
@@ -175,7 +172,6 @@ for(district_idx in seq_along(District_list)) {
     plot = combined_plot,
    width = 12, height = 6)
   
- 
   #Dicker fuller test for stationarity
   adf_result <- adf.test(ts_incidence)
   
@@ -209,12 +205,6 @@ for(district_idx in seq_along(District_list)) {
   #Get the column names of the covariates from the saved model
   covariate_names <- colnames(best_model_with_ITN$xreg)
   
-  # some district like kilolo seem to have a drift in the model
-  if ("drift" %in% covariate_names) {
-    # Delete the covariate_to_delete from covariate_names
-    covariate_names <- covariate_names[covariate_names != "drift"]
-  }
-  
   #Select the columns from the dataframe
   # xreg = (data[covariate_names])
   data <- data[, c( "date", "incidence", covariate_names)]
@@ -222,15 +212,13 @@ for(district_idx in seq_along(District_list)) {
   #log transform the data
   data[, -1] <- log(data[, -1])
   
-  # ts_data <- ts(data[, -1], start = c(2017, 6), frequency = 12)
   ts_data <- ts(data[, -1], start = c(startY, startM), frequency = 12)
-  
   ts_subset <- window(ts_data, start = c(deploymentY,deploymentM), end=c(twelvedatepostinterventionY, twelvedatepostinterventionM), frequency = 12)
-  
   ts_autoplot <- window(ts_data, start = c(startY, startM), end=c(twelvedatepostinterventionY, twelvedatepostinterventionM), frequency = 12)
   
-  # Just checking the series
+  # Checking the series
   autoplot(ts_autoplot)
+  
   # Create the plot using autoplot
   date <- as.Date(deployment_date)
   
@@ -248,13 +236,12 @@ for(district_idx in seq_along(District_list)) {
     ggtitle(District_list[district_idx])+
     geom_vline(xintercept = decimal_date, linetype = "dashed", color = "black")
   
-  setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\Covariate_autoplots")
+  setwd("filepath\\Results\\Covariate_autoplots")
   print(plot)
   ggsave((paste0( District_list[district_idx], "_autoplot",".png")), width=10, height=7, dpi=300)
  
   #transform to dataframe
-  ts_subset_df = transform(as.data.frame(ts_subset))
-  
+  ts_subset_df = transform(as.data.frame(ts_subset))  
   xreg = as.matrix(ts_subset_df[covariate_names])
   
   #Forecast
@@ -280,7 +267,6 @@ for(district_idx in seq_along(District_list)) {
   col_order <- c("date", "fitted", "fc.ts","Lowci", "Highci", "Lowpi","Highpi")
   ts_data.forecast_df<- ts_data.forecast_df[, col_order]
   
-  
   #merge with fitted values of best_model
   fitted_all_df = cbind(
     c(fitted(best_model_with_ITN)),
@@ -291,9 +277,7 @@ for(district_idx in seq_along(District_list)) {
   
   colnames(fitted_all_df) = c("fitted", "Lowci", "Highci")
   
-  
   date = seq(from = start_date, to = as.Date(datebeforedeployment), by = 'month')
-  
   
   fitted_all_df<-cbind(fitted_all_df,date)
   fitted_all_df['Lowpi'] <- NA
@@ -308,7 +292,6 @@ for(district_idx in seq_along(District_list)) {
   fitted_all_df$expfitted<-c(exp(fitted_all_df$fitted))
   fitted_all_df$expLowci<-c(exp(fitted_all_df$fitted-(2*(best_model_with_ITN)$sigma2)))
   fitted_all_df$expHighci<-c(exp(fitted_all_df$fitted+(2*(best_model_with_ITN)$sigma2)))
-  
   
   # Combine with observed data
   #to reintroduce the rows that were previously deleted
@@ -350,7 +333,6 @@ for(district_idx in seq_along(District_list)) {
   #compute absdiff and % of cases averted (ratio)
   merged_df <- merged_df %>%
     mutate(diff= expfc.ts - incidence)
-  
   
   #remove NA values so as to get incidence post intervention values to compute abs diff
   merged_df2 <- merged_df[!is.na(merged_df$expfc.ts),]
@@ -406,7 +388,7 @@ for(district_idx in seq_along(District_list)) {
   
   write.csv(merged_df, result_file)
   
-  #%of cases averted
+  # %of cases averted/1000
   ratio=merged_df[1,23]
   ratio=ratio$ratio
   
@@ -414,9 +396,7 @@ for(district_idx in seq_along(District_list)) {
   absdiff=merged_df[1,26]
   absdiff= absdiff$ absdiff
   
-  setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\Forecast_plots")
-  
-
+  setwd("filepath\\Results\\Forecast_plots")
   
   plot <- ggplot(merged_df, aes(x = date)) +
     
@@ -469,7 +449,7 @@ for(district_idx in seq_along(District_list)) {
     geom_vline(
       xintercept = as.Date(deployment_date),
       linetype = "longdash",
-      linewidth = 1.0,       # ✅ thicker
+      linewidth = 1.0,       
       colour = "black"
     ) +
   
@@ -530,10 +510,12 @@ for(district_idx in seq_along(District_list)) {
 all_merged_df <- dplyr::bind_rows(merged_list)
 coeff_df <- do.call(rbind, coeff_list)
 
+#-----------------------------------------------------
+# Produce plots per region (Supplementary Figure S4)
+#-----------------------------------------------------
 
-#Supplementary Figure S4:
 #merge to region name
-names_correspond <- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\names_correspond.xlsx")
+names_correspond <- read_excel("filepath\\Input_data\\names_correspond.xlsx")
 
 all_merged_df   <-all_merged_df   %>%
   left_join(names_correspond, by = "District")
@@ -656,15 +638,15 @@ for(region_idx in seq_along(Region_list)) {
   )
 }
 
+#---------------------------------------
+# Covariate matrix heat map (Figure 4)
+#---------------------------------------
 
-###########################################
-# Figure 4: Covariate matrix heat map
-###########################################
-#just to get exogenous variables names
-setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\AICc")
-AIC_files <- list.files(path = "C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\AICc")
+# Get exogenous variables names
+setwd("filepath\\Results\\AICc")
+AIC_files <- list.files(path = "filepath\\Results\\AICc")
 
-
+#merge the AIC files for all districts
 df.list <- lapply(AIC_files, function(filename) {
   print(paste("Merging",filename,sep=" "))
   read_csv(filename)
@@ -806,28 +788,16 @@ ggsave(
   units  = "cm"
 )
 
-ggsave(
-  "covariate_coverage_heatmap.tiff",
-  plot        = p,
-  width       = 24,
-  height      = 10,
-  units       = "cm",
-  dpi         = 600,
-  compression = "lzw"
-)
 
+#------------------------------------------------------------------------------
+# Bar plot of impact indicators by strata with confidence interval (Figure 6)
+#------------------------------------------------------------------------------
+setwd("filepath\\Results")
 
-
-
-##################################################################
-#Figure 6: Bar plot of ratios by strata with confidence interval
-####################################################################
-setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results")
-
-Strata_2020<- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\Strata_2020.xlsx")
+Strata_2020<- read_excel("filepath\\Input_data\\Strata_2020.xlsx")
 
 Forecast_files <- list.files(
-  path = "C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results\\Forecast_result",
+  path = "filepath\\Results\\Forecast_result",
   pattern = "_forecast\\.csv$",
   full.names = TRUE
 )
@@ -839,17 +809,12 @@ df.list <- lapply(Forecast_files, function(filename) {
 
 Forecast_results<- as.data.frame(do.call("rbind", df.list))
 
-Forecast_results  <- Forecast_results   %>% 
-  mutate(code = as.character(District)) %>% 
-  left_join(Strata_2020, by="District")
-
 Forecast_results2<-Forecast_results %>%
   group_by(Region,District)%>%
   summarise(ratio=mean(ratio,na.rm=TRUE ),S2=mean(S2,na.rm=TRUE ), S1=mean(S1,na.rm=TRUE ), ratio_low=mean(ratio_low,na.rm=TRUE ),ratio_high=mean(ratio_high,na.rm=TRUE ),S1_low=mean(S1_low,na.rm=TRUE ), S1_high=mean(S1_high,na.rm=TRUE ),S2_low= mean(S2_low,na.rm=TRUE ),S2_high=mean(S2_high,na.rm=TRUE ),absdiff=mean(absdiff,na.rm=TRUE ),absdiff_low=mean(absdiff_low,na.rm=TRUE ),absdiff_high=mean(absdiff_high,na.rm=TRUE ))
 
 words <- paste(c("District", "Council"), collapse = "|")
 Forecast_results2 $District2<-trimws(gsub(words, "\\1", Forecast_results2$District))
-
 
 #attach risk strata
 Forecast_results2  <- Forecast_results2   %>% 
@@ -901,7 +866,7 @@ p <- ggplot(Forecast_results2) +
 print(p)
 ggsave((paste0("casesaverted", ".png")), width=10, height=7, dpi=300)
 
-#absolute difference
+#absolute difference in incidence
 
 p <- ggplot(Forecast_results2) +
   geom_col(
