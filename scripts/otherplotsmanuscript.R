@@ -5,9 +5,12 @@
 packages_needed = c("anomalize","tibbletime","ggpubr","tseries","forecast", "leaps", "dplyr","gsubfn", "xlsx", "openxlsx", "readxl", "tidyverse", "ggplot2", "cowplot", "tidyr", "reshape")
 lapply(packages_needed, require, character.only = TRUE)
 
-# ITN access variability
-input_data <- read_excel("C:\\Users\\thawsu\\switchdrive\\Institution\\Netcell Project\\Consultancy Swiss TPH\\Manuscripts\\Retrospectiveimpact_TZ\\Codes\\impact_analysis_inputdata.xlsx")
+#--------------------------------------
+# ITN access variability (Figure 1a)
+#--------------------------------------
+input_data <- read_excel("filepath\\impact_analysis_inputdata.xlsx")
 
+#get the itn access values following campaign
 deployment_ITN <- input_data %>%
   filter(!is.na(deployment_date),
          date == deployment_date) %>%
@@ -15,7 +18,8 @@ deployment_ITN <- input_data %>%
   slice(1) %>%
   ungroup()
 
-Admin2 <- st_read(file.path("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\Shapefile\\District edited Jan 2021.shp"))
+#import shapefile
+Admin2 <- st_read(file.path("filepath\\Input_data\\Shapefile\\District edited Jan 2021.shp"))
 
 district_ITN_map <- Admin2 %>%
   left_join(deployment_ITN, by = c("DHIS2_Dist" = "District"))
@@ -36,12 +40,10 @@ ggplot(district_ITN_map) +
     plot.margin = margin(5, 5, 5, 5)
   )
 
-
-#Supplementary Figure S1
-# Import data 
-
-result_folder <- "C:\\Users\\thawsu\\switchdrive\\Institution\\Netcell Project\\Consultancy Swiss TPH\\Tanzania\\Impact analysis\\ARIMA ITS\\Scicore run\\Model_Fit\\Results\\Forecast_manualorders\\decomposed_plots"
-
+#--------------------------------------
+# Supplementary Figure S1
+#--------------------------------------
+result_folder <- "filepath\\decomposed_plots"
 
 Region_list <- unique(input_data$Region)
 
@@ -59,7 +61,8 @@ for(region_idx in seq_along(Region_list)) {
     
     data <- region_data %>%
       filter(District == District_list[district_idx])
-    
+
+    #process data
     data$date <- as.Date(data$date)
     data <- data[order(data$date), ]
     
@@ -165,23 +168,21 @@ for(region_idx in seq_along(Region_list)) {
   )
 }
 
-
-#Figure 3
+#--------------------------------------
+#Figure 3: incidence trends
+#--------------------------------------
 input_data2<- input_data %>% 
   tibbletime::as_tbl_time(index = date)
 
 input_data2<-input_data2[order(input_data2$date),]
 
-
 input_data2_STL_decompose<-input_data2 %>%
   group_by(Region, District)%>%
   time_decompose(incidence, method = "stl", trend="12 months")
 
-
 plot_df <- input_data2_STL_decompose %>%
   ungroup() %>%
   as.data.frame()
-
 
 #define intervention period
 intervention_dates <- data.frame(
@@ -211,13 +212,11 @@ intervention_dates <- data.frame(
   ))
 )
 
-
 intervention_dates <- intervention_dates %>%
   mutate(
     xmin = intervention_date,
     xmax = intervention_date + 31
   )
-
 
 # Plot
 p <- ggplot(
@@ -238,8 +237,6 @@ p <- ggplot(
     fill = "#D55E00",
     alpha = 0.2
   ) +
-  
-  
   
   geom_line(
     aes(group = District, colour = Region),
@@ -304,7 +301,6 @@ p <- ggplot(
 
 p
 
-
 ggsave(
   filename = "incidence_trends.png",
   plot = p,
@@ -314,81 +310,10 @@ ggsave(
   dpi = 600
 )
 
-
-#Figure 1a map
-packages_needed <- c("sf","tmap","rgdal","merTools","lme4","dplyr","gsubfn", "xlsx", "openxlsx", "readxl", "tidyverse", "cowplot", "grid", "gridExtra", "RColorBrewer", "shapefiles", "raster", "ggplot2", "cowplot", "tidyr", "ggrepel", "ggExtra", "ggridges", "ggthemes","ggpubr","reshape","viridis", "scales","RColorBrewer","ggsci","reshape","stringr","ggeffects","effects","nlme","sjPlot")
-lapply(packages_needed, require, character.only = TRUE)
-
-
-ITN_TZ<-read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\ITN_year_TZ_map.xlsx")
-
-Names_correspondence<-read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\names_correspondence_forITN_TZ.xlsx")
-
-#Join names correaspondence to dataset
-ITN_TZ <- ITN_TZ %>% 
-  mutate(code = as.character(council)) %>% 
-  left_join(Names_correspondence, by="council")
-
-#remove unnecessary columns
-ITN_TZ <- ITN_TZ %>% dplyr::select(-c(6,7))
-
-#rename column
-names(ITN_TZ)[names(ITN_TZ) == "region.x"] <- "Region"
-
-
-#Campaign
-Campaign<-ITN_TZ%>%filter(Servicedeliverymechanism=="Campaign")
-
-#make it into wide format
-ITN_TZ_wide_Campaign <- spread(Campaign, year, Nets)
-
-#relace NA with no
-ITN_TZ_wide_Campaign[is.na(ITN_TZ_wide_Campaign)] <- "No Campaign"
-
-# Replace String with Another Stirng
-ITN_TZ_wide_Campaign[ITN_TZ_wide_Campaign == 'Yes'] <- 'Campaign'
-
-#merge to shapefile
-merged_Campaign <- merge(
-  Admin2,
-  ITN_TZ_wide_Campaign,
-  by.x = "DHIS2_Dist",
-  by.y = "Council_shapefile",
-  all.x = TRUE,
-  duplicateGeoms = TRUE
-)
-
-
-
-Campaign.map <- tm_shape(merged_Campaign) +
-  tm_fill(
-    "2020",
-    fill.scale = tm_scale(values = c("darkgreen", "grey")),
-    fill.legend = tm_legend_hide()
-  ) +
-  tm_borders() +
-  tm_add_legend(
-    type = "polygons",
-    labels = "Campaign councils",
-    fill = "darkgreen",
-    col = NA
-  ) +
-  tm_layout(
-    legend.position = tm_pos_in("left", "bottom"),
-    legend.frame = FALSE,
-    legend.bg = FALSE,
-    frame = FALSE,
-    legend.text.size = 1.2
-  )
-
-Campaign.map
-
-setwd("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Results")
-tmap_save(Campaign.map, "Campaign.map.jpg")
-
-
-#Figure 1b approach
-observed<-read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\observed.xlsx")
+#--------------------------------------
+#Figure 1b analytical approach
+#--------------------------------------
+observed<-read_excel("filepath\\Input_data\\observed.xlsx")
 
 pre_data <- observed %>% filter(date <= as.Date(deployment_date))
 post_data <- observed %>% filter(date >= as.Date(deployment_date))
@@ -397,24 +322,17 @@ observed$date<-as.Date(observed$date)
 plot <- ggplot() +
   # Pre-intervention model fitted values (only pre period)
   geom_line(data = pre_data, aes(x=date, y=fitted_autoarima), color="#D62728", size=1) +
-  # geom_point(aes(x=date, y=(fitted_autoarima)),color="lightblue4",size=4) +
-  # Post-intervention model fitted values (only post period, if needed)
-  # geom_line(data = post_data, aes(x=date, y=fitted_autoarima), color="blue", size=1) +
   
   # Observed incidence (all periods)
   geom_point(data = observed, aes(x=date, y=exp(Incidence)), color="#1F77B4", size=4) +
   geom_line(data = post_data, aes(x=date, y=exp(Incidence)),color="#1F77B4", size=1)+
   
-  # ITNhigh line across all dates (or you can also split)
-  # geom_line(data = observed, aes(x=date, y=exp(ITNhigh)/scale), color="darkseagreen4", size=1) +
-  #geom_point(data = observed, aes(x=date, y=exp(ITNhigh)/scale), color="darkseagreen4", size=2) +
-  # geom_line(data = observed,aes(x=date, y=exp(ITNlow)/scale),color="darkseagreen4", size=1)+
-  # geom_point(data = observed, aes(x=date, y=exp(ITNlow)/scale),color="darkseagreen4",size=2) +
   geom_ribbon(data = post_data, 
               aes(x = date, 
                   ymin = pmin(manual2, exp(Incidence)), 
                   ymax = pmax(manual2, exp(Incidence))), 
               fill = "#FF9999", alpha = 0.4) +
+
   # Ribbon across all dates
   geom_ribbon(data = pre_data, aes(x=date, ymin=manual_lowci, ymax=manual_highci), fill="grey50", alpha=0.5) +
   
@@ -450,5 +368,5 @@ plot <- ggplot() +
   ) 
 
 print(plot)
-ggsave((paste0("plotformanuscript_counterfatual", ".png")), width=9, height=7, dpi=300)
+ggsave((paste0("plotformanuscript_counterfactual", ".png")), width=9, height=7, dpi=300)
 
