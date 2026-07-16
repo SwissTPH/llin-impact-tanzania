@@ -1,0 +1,184 @@
+##################################
+#PRCC sensitivity analysis: Figure 7
+##################################
+
+#Download packages
+packages_needed = c("sensitivity","ggpubr","tseries","forecast", "leaps", "dplyr","gsubfn", "xlsx", "openxlsx", "readxl", "tidyverse", "ggplot2", "cowplot", "tidyr", "reshape")
+lapply(packages_needed, require, character.only = TRUE)
+
+#Import data 
+input_data <- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\impact_analysis_inputdata.xlsx")
+Forecast_results <- read_excel("C:\\Users\\thawsu\\Swiss Tropical and Public Health Institute, Swiss TPH\\AIM - AIM Drive\\Country work\\Tanzania\\Tanzania 2026\\ITN impact evaluation\\9. Manuscripts\\data_codes\\Input_data\\Forecast_results.xlsx")
+
+# Function to import the model for a specific district name in order tyo extract the covariate coefficients
+import_model_by_district <- function(district_name) {
+  # Construct the file path for the RDS file based on the district name
+  file_path <- paste0("filepath\\Best_model\\", district_name, "_best_model_with_ITN.rds")
+  
+  # Load the model from the RDS file
+  model <- readRDS(file_path)
+  
+  # Return the loaded model
+  return(model)
+}
+
+District_list = unique(input_data$District)
+
+#standardise the coefficients
+standardized_results <- lapply(District_list, function(district_name) {
+  
+  # import model for this district
+  best_model_with_ITN <- import_model_by_district(district_name)
+  
+  # extract xreg coefficients
+  raw_coefs <- coef(best_model_with_ITN)[colnames(best_model_with_ITN$xreg)]
+  
+  # standard deviation of covariates
+  sd_x <- apply(best_model_with_ITN$xreg, 2, sd, na.rm = TRUE)
+  
+  # standard deviation of outcome
+  sd_y <- sd(best_model_with_ITN$x, na.rm = TRUE)
+  
+  # standardized coefficients
+  standardized_coefs <- raw_coefs * (sd_x / sd_y)
+  
+  data.frame(
+    District = district_name,
+    Covariate = names(standardized_coefs),
+    Raw_coefficient = raw_coefs,
+    Standardized_coefficient = standardized_coefs
+  )
+  
+}) %>%
+  bind_rows()
+
+impact_row <- Forecast_results %>%
+  group_by(District)%>%
+  slice(1) %>%
+  dplyr::select(District, ratio, ratio_low, ratio_high,
+                absdiff, absdiff_low, absdiff_high)
+
+# Combine impact + covariate means into one row
+standardized_results_wide <- standardized_results %>%
+  dplyr::select(District, Covariate, Standardized_coefficient) %>%
+  pivot_wider(
+    names_from = Covariate,
+    values_from = Standardized_coefficient,
+    names_prefix = "Std_coef_"
+  )
+
+summary_row <- impact_row %>%
+  left_join(standardized_results_wide, by = "District")
+
+#combine the different lags into one column
+prcc_input_df <- summary_row %>%
+  mutate(
+    rainfall_selected    = dplyr::coalesce(Std_coef_Rainfall_lag1, Std_coef_Rainfall_lag2,
+                                           Std_coef_Rainfall_lag3),
+    
+    NDVI_selected        = dplyr::coalesce(Std_coef_NDVI, Std_coef_NDVI_lag1, Std_coef_NDVI_lag2),
+    
+    temperature_selected = dplyr::coalesce(Std_coef_Temperature, Std_coef_Temperature_lag1, 
+                                           Std_coef_Temperature_lag3),
+    
+    LLIN_access_selected  = dplyr::coalesce(Std_coef_ITN_access),
+    
+    Reporting_rate_selected    = dplyr::coalesce(Std_coef_RR_month)
+  ) %>%
+  dplyr::select(District,
+                ratio, ratio_low, ratio_high,
+                absdiff, absdiff_low, absdiff_high,
+                rainfall_selected, NDVI_selected,
+                temperature_selected,LLIN_access_selected,
+                Reporting_rate_selected)
+
+#replace NA with 0
+prcc_input_df[is.na(prcc_input_df)] <- 0
+
+predictor_cols <- c(
+  "rainfall_selected",
+  "NDVI_selected",
+  "temperature_selected",
+  "LLIN_access_selected",
+  "Reporting_rate_selected"
+)
+
+#run PRCC on the coefficients and impact indicator - % of cases averted/1000
+
+#function
+calculate_prcc <- function(data, predictors, outcome, nboot = 1000) {
+  
+  complete <- data %>%
+    ungroup() %>%
+    dplyr::select(all_of(c(predictors, outcome))) %>%
+    tidyr::drop_na()
+  
+  X <- complete %>% dplyr::select(all_of(predictors))
+  y <- complete[[outcome]]
+  n <- nrow(complete)
+  
+  prcc_out <- sensitivity::pcc(X, y, rank = TRUE, nboot = nboot)
+  
+  prcc_vals <- prcc_out$PRCC$original
+  
+  k <- length(predictors) - 1
+  df <- n - 2 - k
+  
+  t_stat <- prcc_vals * sqrt(df / (1 - prcc_vals^2))
+  p_vals <- 2 * pt(-abs(t_stat), df = df)
+  
+  data.frame(
+    parameter = predictors,
+    prcc = prcc_vals,
+    p_value = p_vals
+  )
+}
+
+
+prcc_results_ratio <- calculate_prcc(prcc_input_df, predictor_cols, "ratio")
+print(prcc_results_ratio )
+
+prcc_results_ratio %>%
+  mutate(
+    parameter = dplyr::recode(parameter,
+                       "Reporting_rate_selected"    = "Reporting rate",
+                       "LLIN_access_selected"  = "LLIN_access",
+                       "NDVI_selected"        = "NDVI",
+                       "rainfall_selected"    = "Rainfall",
+                       "temperature_selected" = "Temperature"
+    ),
+    parameter = reorder(parameter, abs(prcc))
+  ) %>%
+  ggplot(aes(x = prcc, y = parameter, fill = prcc > 0)) +
+  geom_col(width = 0.65, color = "black", linewidth = 0.3) +
+  geom_vline(xintercept = 0, linewidth = 0.7, color = "grey20") +
+  scale_fill_manual(
+    values = c("#B2182B", "#2166AC"),   
+    labels = c("Negative", "Positive"),
+    name   = "Direction"
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0.05, 0.08))) +
+  labs(
+    x     = "Partial Rank Correlation Coefficient",
+    y     = NULL,
+    title = "Sensitivity of % Cases Averted to Council-Level Covariates"
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text        = element_text(size = 16, color = "black"),
+    axis.title.x     = element_text(size = 17, margin = margin(t = 10)),
+    axis.line        = element_line(linewidth = 0.6, color = "black"),
+    axis.ticks       = element_line(linewidth = 0.6, color = "black"),
+    plot.title       = element_text(face = "bold", size = 19, hjust = 0.5, margin = margin(b = 12)),
+    legend.title     = element_text(size = 15, face = "bold"),
+    legend.text      = element_text(size = 14),
+    legend.position  = "right",
+    plot.margin      = margin(15, 20, 10, 10)
+  )
+
+setwd("filepath\\Results")
+
+ggsave("prcc_sensitivity_plot.png", width = 9, height = 6, dpi = 600, bg = "white")
+
+
+
