@@ -31,13 +31,14 @@ The analytical workflow consists of the following steps:
 2. Aggregation of health facility data to council level
 3. Assembly of environmental and health system covariates
 4. Selection of lagged covariates using cross-correlation analysis
-5. ARIMA model fitting for the pre-intervention period using auto.arima function
-6. Checking the model orders and residuals and updating the orders where necessary
-7. ARIMA model fitting using revised orders
-8. Counterfactual forecasting assuming no LLIN campaign
+5. ARIMA model fitting for the pre-intervention period using auto.arima function (fit_model_autoarima.R)
+6. Checking the model orders using ACF/PACF plots and residual plots and updating the orders where necessary (forecast_model.R)
+7. ARIMA model fitting using revised orders (fit_model_manualorder.R)
+8. Counterfactual forecasting assuming no LLIN campaign (forecast_model.R)
 10. Estimation of:
    - percentage of malaria cases/1000 population averted
    - absolute reduction in malaria incidence/1000 population
+11. PRCC sensitivity analysis (PRCC_sensitivity_analysis.R)
 11. Generation of manuscript figures and tables
 
 ## Statistical methods
