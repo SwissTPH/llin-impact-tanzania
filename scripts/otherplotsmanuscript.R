@@ -318,7 +318,7 @@ observed<-read_excel("filepath\\Input_data\\observed.xlsx")
 
 deployment_date <- "2020-07-01"
 cutoff_date <- as.Date("2021-12-31")
-annotation_x <- cutoff_date + 100   # push annotations ~100 days past the border, into the margin
+annotation_x <- cutoff_date + 100  
 
 observed$date <- as.Date(observed$date)
 pre_data  <- observed %>% filter(date <= as.Date(deployment_date))
@@ -387,7 +387,7 @@ annotate("text", x = as.Date(deployment_date) - 365*3.1, y = 5.5,
            xend = as.Date(deployment_date) - 90, yend = 3.9,
            curvature = 0.2, arrow = arrow(length = unit(0.2, "cm")), color = "#1F77B4") +
   
-  # right-side annotations — now clearly past the border, into the margin
+  # right-side annotations 
   annotate("text", x = annotation_x, y = 3.6, 
            label = "Forecasted counterfactual\nsimulated by model:\nWith low coverage\nof LLIN", 
            size = 5.5, color = "#1F77B4", hjust = 0,fontface = "bold") +
@@ -414,7 +414,7 @@ print(plot)
 ggsave(
   "plotformanuscript_counterfactual.tiff",
   plot = plot,
-  width = 12,   # widened slightly further since margin also grew
+  width = 12,  
   height = 7,
   units = "in",
   dpi = 600,
