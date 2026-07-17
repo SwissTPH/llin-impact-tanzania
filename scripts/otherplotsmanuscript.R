@@ -315,42 +315,44 @@ ggsave(
 #--------------------------------------
 observed<-read_excel("filepath\\Input_data\\observed.xlsx")
 
-pre_data <- observed %>% filter(date <= as.Date(deployment_date))
-post_data <- observed %>% filter(date >= as.Date(deployment_date))
-observed$date<-as.Date(observed$date)
+
+deployment_date <- "2020-07-01"
+cutoff_date <- as.Date("2021-12-31")
+annotation_x <- cutoff_date + 100   # push annotations ~100 days past the border, into the margin
+
+observed$date <- as.Date(observed$date)
+pre_data  <- observed %>% filter(date <= as.Date(deployment_date))
+post_data <- observed %>% filter(date >= as.Date(deployment_date) & date <= cutoff_date)
 
 plot <- ggplot() +
-  # Pre-intervention model fitted values (only pre period)
-  geom_line(data = pre_data, aes(x=date, y=fitted_autoarima), color="#D62728", size=1) +
+  geom_line(data = pre_data, aes(x=date, y=fitted_autoarima, color="Model fitted"), size=1) +
   
-  # Observed incidence (all periods)
-  geom_point(data = observed, aes(x=date, y=exp(Incidence)), color="#1F77B4", size=4) +
-  geom_line(data = post_data, aes(x=date, y=exp(Incidence)),color="#1F77B4", size=1)+
+  geom_point(data = observed %>% filter(date <= cutoff_date), aes(x=date, y=exp(Incidence), color="Observed"), size=4) +
+  geom_line(data = post_data, aes(x=date, y=exp(Incidence), color="Observed"), size=1)+
   
   geom_ribbon(data = post_data, 
               aes(x = date, 
                   ymin = pmin(manual2, exp(Incidence)), 
                   ymax = pmax(manual2, exp(Incidence))), 
               fill = "#FF9999", alpha = 0.4) +
-
-  # Ribbon across all dates
   geom_ribbon(data = pre_data, aes(x=date, ymin=manual_lowci, ymax=manual_highci), fill="grey50", alpha=0.5) +
   
-  #counterfactual
-  geom_line(data = post_data, aes(x=date, y=(manual2)),color="#2CA02C", size=1)+
-  geom_point(data = post_data,aes(x=date, y=(manual2)),color="#2CA02C",size=4) +
+  geom_line(data = post_data, aes(x=date, y=(manual2), color="Counterfactual"), size=1)+
+  geom_point(data = post_data,aes(x=date, y=(manual2), color="Counterfactual"), size=4) +
   geom_ribbon(data = post_data, aes(x=date,,ymin=manual_low_lowci2, ymax=manual_low_highci2),fill="#2CA02C", alpha=0.5)+
-  #
-  # Intervention line
+  
   geom_vline(xintercept = as.Date(deployment_date), linetype=4) +
   
-  labs(x="Year", y="Incidence") +
+  labs(x="Year", y="Incidence", color = NULL) +
   
-  # scale_y_continuous(name='Incidence', sec.axis = sec_axis(~.*scale, name="ITN access")) +
+  scale_color_manual(
+    values = c("Model fitted" = "#D62728", "Observed" = "#1F77B4", "Counterfactual" = "#2CA02C"),
+    breaks = c("Counterfactual", "Model fitted", "Observed")
+  ) +
   
   theme(
     legend.title = element_text(size = 8, face="bold", colour="black"),
-    legend.text = element_text(size = 8, face="bold", colour="black"),
+    legend.text = element_text(size = 14, face="bold", colour="black"),
     axis.title=element_text(size=24, face="bold", colour="black"),
     axis.text = element_text(size=24, face="bold", colour="black"),
     strip.text = element_text(size = 15, face="bold", colour="black"),
@@ -358,15 +360,64 @@ plot <- ggplot() +
     panel.background = element_rect(fill = "white", colour = "black"),
     panel.grid.major = element_line(colour = "grey90", size = 0.2),
     panel.grid.minor = element_line(colour = "grey98", size = 0.5),
-    plot.title = element_text(face="bold")
+    plot.title = element_text(face="bold"),
+    plot.margin = margin(t = 20, r = 220, b = 10, l = 10)  # <-- widened further for margin text
   )+
-  scale_x_date(limits = c(min(observed$date), as.Date("2021-12-31")))+
+  guides(color = guide_legend(override.aes = list(size = 2, linetype = 1, shape = NA))) +
   scale_y_continuous(
     name='Incidence',
-    limits = c(0, 5)                   # Set y-axis from 0 to 4.5
-    #sec.axis = sec_axis(~.*scale, name="ITN access")
-  ) 
+    limits = c(0, 5.5)
+  ) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  coord_cartesian(xlim = c(min(observed$date), cutoff_date), clip = "off") +
+  
+  # ---- ANNOTATIONS ----
+
+annotate("text", x = as.Date(deployment_date) - 365*3.1, y = 5.5, 
+         label = "Pre-intervention", size = 6, fontface = "bold", color = "black", hjust = 0.5) +
+  annotate("text", x = as.Date(deployment_date) + 365*0.7, y = 5.5, 
+           label = "Post-intervention", size = 6, fontface = "bold", color = "black", hjust = 0.5) +
+  
+  annotate("text", x = as.Date(deployment_date) - 365*1.2, y = 4.9, 
+           label = "Data points the model is fitted to", size = 5.5, color = "#1F77B4", hjust = 0.5,fontface = "bold") +
+  annotate("curve", x = as.Date(deployment_date) - 365*1.4, y = 4.7, 
+           xend = as.Date(deployment_date) - 365*2, yend = 2.95,
+           curvature = -0.2, arrow = arrow(length = unit(0.2, "cm")), color = "#1F77B4") +
+  annotate("curve", x = as.Date(deployment_date) - 365*1.0, y = 4.7, 
+           xend = as.Date(deployment_date) - 90, yend = 3.9,
+           curvature = 0.2, arrow = arrow(length = unit(0.2, "cm")), color = "#1F77B4") +
+  
+  # right-side annotations — now clearly past the border, into the margin
+  annotate("text", x = annotation_x, y = 3.6, 
+           label = "Forecasted counterfactual\nsimulated by model:\nWith low coverage\nof LLIN", 
+           size = 5.5, color = "#1F77B4", hjust = 0,fontface = "bold") +
+  annotate("curve", x = annotation_x - 5, y = 3.5, 
+           xend = as.Date(deployment_date) + 365*0.5, yend = 3.6,
+           curvature = -0.3, arrow = arrow(length = unit(0.2, "cm")), color = "#1F77B4") +
+  
+  annotate("text", x = annotation_x, y = 2.2, 
+           label = "Epidemiological\nimpact due to LLINs", 
+           size = 5.5, color = "#1F77B4", hjust = 0,fontface = "bold") +
+  annotate("curve", x = annotation_x - 5, y = 2.2, 
+           xend = as.Date(deployment_date) + 365*0.8, yend = 1.6,
+           curvature = -0.3, arrow = arrow(length = unit(0.5, "cm")), color = "#1F77B4") +
+  
+  annotate("text", x = annotation_x, y = 0.4, 
+           label = "Observed data in DHIS2:\nWith current\ncoverage of LLIN", 
+           size = 5.5, color = "#1F77B4", hjust = 0,fontface = "bold") +
+  annotate("curve", x = annotation_x - 5, y = 0.5, 
+           xend = as.Date(deployment_date) + 365*1.2, yend = 0.2,
+           curvature = -0.3, arrow = arrow(length = unit(0.2, "cm")), color = "#1F77B4")
 
 print(plot)
-ggsave((paste0("plotformanuscript_counterfactual", ".png")), width=9, height=7, dpi=300)
 
+ggsave(
+  "plotformanuscript_counterfactual.tiff",
+  plot = plot,
+  width = 12,   # widened slightly further since margin also grew
+  height = 7,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
