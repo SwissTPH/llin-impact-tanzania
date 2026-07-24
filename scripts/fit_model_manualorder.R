@@ -96,12 +96,13 @@ ts_RR_month = ts(log(data$RR_month), start=c(startY,startM),
                  end=c(yearbeforedeployment, monthbeforedeployment), frequency = 12)
 ts_ITN_access = ts(log(data$ITNaccess_campaign), start=c(startY,startM), 
                    end=c(yearbeforedeployment, monthbeforedeployment), frequency = 12)
+ts_total_attendance_OPD = ts(log(data$totalattendance_OPD), start=c(startY,startM), 
+                        end=c(yearbeforedeployment, monthbeforedeployment), frequency = 12)
 
 # Initialize the covariate matrix
+merged_covariates = cbind(ts_incidence,ts_ITN_access,ts_RR_month,ts_total_attendance_OPD)
 
-merged_covariates = cbind(ts_incidence,ts_ITN_access,ts_RR_month)
-
-colnames_cov = c("Incidence", "ITN_access","RR_month")
+colnames_cov = c("Incidence", "ITN_access","RR_month","Total_attendance_OPD")
 
 
 print("Select the best lag for each covariate for the pre-intervention period")
