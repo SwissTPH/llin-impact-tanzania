@@ -133,7 +133,7 @@ for(district_idx in seq_along(District_list)) {
   twelvedatepostinterventionY<-as.numeric(format(twelvedatepostintervention,'%Y'))
   twelvedatepostinterventionM<-as.numeric(format(twelvedatepostintervention," %m"))
   
-  #rename columns in lagged_df to match covariate names saved in model
+  #rename columns in input data to match covariate names saved in model
   data<-data %>% 
     dplyr::rename("ITN_access"="ITNaccess_hillsteady" ) #for forecasting counterfactual, LLIN access was fixed at its pre-intervention level using a hill decay function
 
@@ -374,11 +374,13 @@ for(district_idx in seq_along(District_list)) {
            S1_high=sum(diff_high,na.rm=TRUE),
            S2_low=sum(expfc.ts_lowci,na.rm=TRUE),
            S2_high=sum(expfc.ts_highci,na.rm=TRUE))
-  
+
+  #% of cases averted/1000
   merged_df$ratio<-c(merged_df$S1/merged_df$S2)
   merged_df$ratio_low<-c(merged_df$S1_low/merged_df$S2_low)
   merged_df$ratio_high<-c(merged_df$S1_high/merged_df$S2_high)
 
+  #absoulte difference in incidence
   merged_df$absdiff<-c(merged_df$S2-merged_df$S3)
   merged_df$absdiff_low<-c(merged_df$S2_low-merged_df$S3)
   merged_df$absdiff_high<-c(merged_df$S2_high-merged_df$S3)
@@ -423,7 +425,7 @@ for(district_idx in seq_along(District_list)) {
     # Fitted model
     geom_line(
       aes(y = expfitted,
-          colour = "Model fitted"),
+          colour = "Model fit"),
       linewidth = 1.8,       
       linetype = "solid"
     ) +
@@ -457,7 +459,7 @@ for(district_idx in seq_along(District_list)) {
     scale_colour_manual(
       values = c(
         "Observed" = "#1F77B4",
-        "Model fitted" = "#D62728",
+        "Model fit" = "#D62728",
         "Counterfactual" = "#2CA02C"
       )
     ) +
@@ -561,7 +563,7 @@ for(region_idx in seq_along(Region_list)) {
     
     geom_line(
       aes(y = expfitted,
-          colour = "Model fitted"),
+          colour = "Model fit"),
       linewidth = 1.8       
     ) +
     geom_point(
@@ -590,7 +592,7 @@ for(region_idx in seq_along(Region_list)) {
     scale_colour_manual(
       values = c(
         "Observed" = "#1F77B4",
-        "Model fitted" = "#D62728",
+        "Model fit" = "#D62728",
         "Counterfactual" = "#2CA02C"
       )
     ) +
@@ -692,20 +694,21 @@ melted_cov_df <- melt(cov_df, varnames = c("Area", "Covariate"))
 # Add 'Area' column to the melted dataframe
 melted_cov_df$District <- rownames(cov_df)
 
-#arrange alphabetically
+#rename variables
 melted_cov_df$variable <- factor(melted_cov_df$variable, levels = sort(levels(factor(melted_cov_df$variable))))
 
 melted_cov_df$variable <- gsub("RR_month", "Reporting rate", melted_cov_df$variable)
 
+melted_cov_df$variable <- gsub("Total_attendance_OPD", "Total OPD attendance", melted_cov_df$variable)
+
 p <- ggplot(data = melted_cov_df,
-            aes(x = District, y = variable, fill = as.factor(value))) +
+  aes(x = District, y = variable, fill = as.factor(value))) +
   
   geom_tile(
     color     = "grey60",    
     linewidth = 0.5
   ) +
-  
-
+         
   scale_fill_manual(
     values = c("0" = "white", "1" = "black"),
     labels = c("0" = "No",    "1" = "Yes"),
@@ -781,11 +784,13 @@ print(p)
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 ggsave(
-  "covariate_heatmap.png",
-  plot   = p,
-  width  = 24,
-  height = 10,
-  units  = "cm"
+  "covariate_heatmap.tiff",
+  plot        = p,
+  width       = 24,
+  height      = 10,
+  units       = "cm",
+  dpi         = 600,
+  compression = "lzw"
 )
 
 
@@ -827,82 +832,274 @@ Forecast_results2 <-Forecast_results2  %>%
 group.colors <- c(high = "red", low = "lightgreen", moderate ="orange", 'Very low'= "darkgreen")
 
 #% cases averted
+# Councils to mark with an asterisk
+star_councils <- c(
+  "Kondoa Town",
+  "Kondoa",
+  "Handeni Town",
+  "Tunduma Town"
+)
+
+Forecast_results2 <- Forecast_results2 %>%
+  mutate(
+    star = ifelse(District2 %in% star_councils, "*", "")
+  )
+
 p <- ggplot(Forecast_results2) +
+  
   geom_col(
-    mapping = aes(x = reorder(District2, -ratio*100),
-                  y = ratio*100,
-                  fill = Strata_2020),
-    position = position_dodge(width = 0.9)   # dodge grouped bars
+    aes(
+      x = reorder(District2, -ratio * 100),
+      y = ratio * 100,
+      fill = Strata_2020
+    ),
+    width = 0.85
   ) +
+  
   geom_errorbar(
-    mapping = aes(x = reorder(District2, -ratio*100),
-                  ymin = ratio_low*100,
-                  ymax = ratio_high*100,
-                  group = Strata_2020),            
-    position = position_dodge(width = 0.9),
-    width = 0.2,
-    color = "black"
+    aes(
+      x = reorder(District2, -ratio * 100),
+      ymin = ratio_low * 100,
+      ymax = ratio_high * 100
+    ),
+    width = 0.18,
+    linewidth = 0.6,
+    colour = "black"
   ) +
-  scale_x_discrete(guide = guide_axis(angle = 90)) +
-  labs(x = element_blank(),
-       y = "% of cases averted",
-       caption = "") +
+  
+  ## Asterisks
+  geom_text(
+    aes(
+      x = reorder(District2, -ratio * 100),
+      y = ratio_high * 100 + 8,
+      label = star
+    ),
+    size = 8,
+    fontface = "bold"
+  ) +
+  
   scale_fill_manual(
     values = group.colors,
     breaks = c("Very low", "low", "moderate", "high"),
-    labels = c("Very low", "low", "moderate", "high")
+    labels = c("Very low", "low", "moderate", "high"),
+    name = "Malaria risk strata"
   ) +
-  coord_cartesian(ylim = c(-50, 100)) +      # cut scale
+  
+  guides(
+    fill = guide_legend(
+      title.position = "top",
+      title.hjust = 0.5,
+      nrow = 1,
+      byrow = TRUE
+    )
+  ) +
+  
+  coord_cartesian(
+    ylim = c(-55, 105)
+  ) +
+  
+  scale_x_discrete(
+    guide = guide_axis(angle = 90)
+  ) +
+  
+  labs(
+    x = NULL,
+    y = "% of cases averted"
+  ) +
+  
+  theme_bw(base_size = 16) +
+  
   theme(
-    axis.title = element_text(size = 14, face = "bold", colour = "black"),
-    axis.text = element_text(size = 14, face = "bold", colour = "black"),
-    strip.text = element_text(size = 14, face = "bold", colour = "black"),
-    legend.position = "bottom",
-    panel.background = element_rect(fill = "white", colour = "black"),
-    panel.grid.major = element_line(colour = "grey90", size = 0.2),
-    panel.grid.minor = element_line(colour = "grey98", size = 0.5)
+    
+    axis.title = element_text(
+      size = 18,
+      face = "bold",
+      colour = "black"
+    ),
+    
+    axis.text.x = element_text(
+      size = 12,
+      face = "bold",
+      colour = "black"
+    ),
+    
+    axis.text.y = element_text(
+      size = 16,
+      face = "bold",
+      colour = "black"
+    ),
+    
+    panel.grid.major = element_line(
+      colour = "grey90",
+      linewidth = 0.4
+    ),
+    
+    panel.grid.minor = element_line(
+      colour = "grey96",
+      linewidth = 0.2
+    ),
+    
+    panel.border = element_rect(
+      colour = "black",
+      linewidth = 0.8
+    ),
+    
+    legend.position = "top",
+    
+    legend.justification = "center",
+    
+    legend.direction = "horizontal",
+    
+    legend.title = element_text(
+      size = 22,
+      face = "bold",
+      colour = "#1B5E84",
+      hjust = 0.5
+    ),
+    
+    legend.text = element_text(
+      size = 15,
+      colour = "black"
+    ),
+    
+    legend.key.size = unit(0.9, "cm"),
+    
+    legend.key.height = unit(0.9, "cm"),
+    
+    legend.key.width = unit(0.9, "cm"),
+    
+    legend.background = element_blank(),
+    
+    legend.box.background = element_blank()
   )
 
+
 print(p)
-ggsave((paste0("casesaverted", ".png")), width=10, height=7, dpi=300)
+ggsave(
+  "casesaverted.tiff",
+  plot = p,
+  width = 10,  
+  height = 7,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
 
 #absolute difference in incidence
-
 p <- ggplot(Forecast_results2) +
+  
   geom_col(
-    mapping = aes(x = reorder(District2, -absdiff),
-                  y = absdiff,
-                  fill = Strata_2020),
-    position = position_dodge(width = 0.9)   
+    aes(
+      x = reorder(District2, -absdiff ),
+      y = absdiff,
+      fill = Strata_2020
+    ),
+    width = 0.85
   ) +
+  
   geom_errorbar(
-    mapping = aes(x = reorder(District2, -absdiff),
-                  ymin = absdiff_low,
-                  ymax = absdiff_high,
-                  group = Strata_2020),           
-    position = position_dodge(width = 0.9),
-    width = 0.2,
-    color = "black"
+    aes(
+      x = reorder(District2, -absdiff),
+      ymin = absdiff_low ,
+      ymax = absdiff_high
+    ),
+    width = 0.18,
+    linewidth = 0.6,
+    colour = "black"
   ) +
-  scale_x_discrete(guide = guide_axis(angle = 90)) +
-  labs(x = element_blank(),
-       y = "Absolute difference",
-       caption = "") +
+  
+  ## Asterisks
+  geom_text(
+    aes(
+      x = reorder(District2, -absdiff),
+      y = absdiff + 8,
+      label = star
+    ),
+    size = 8,
+    fontface = "bold"
+  ) +
+  
   scale_fill_manual(
     values = group.colors,
     breaks = c("Very low", "low", "moderate", "high"),
-    labels = c("Very low", "low", "moderate", "high")
+    labels = c("Very low", "low", "moderate", "high"),
+    name = "Malaria risk strata"
   ) +
-  coord_cartesian(ylim = c(-40, 200)) +      #cut scale
+  
+  guides(
+    fill = guide_legend(
+      title.position = "top",
+      title.hjust = 0.5,
+      nrow = 1,
+      byrow = TRUE
+    )
+  ) +
+  
+  coord_cartesian(
+    ylim = c(-40, 200)
+  ) +
+  
+  scale_x_discrete(
+    guide = guide_axis(angle = 90)
+  ) +
+  
+  labs(
+    x = NULL,
+    y = "Absolute difference in cases/1000 population"
+  ) +
+  
+  theme_bw(base_size = 16) +
+  
   theme(
-    axis.title = element_text(size = 14, face = "bold", colour = "black"),
-    axis.text = element_text(size = 14, face = "bold", colour = "black"),
-    strip.text = element_text(size = 14, face = "bold", colour = "black"),
-    legend.position = "bottom",
-    panel.background = element_rect(fill = "white", colour = "black"),
-    panel.grid.major = element_line(colour = "grey90", size = 0.2),
-    panel.grid.minor = element_line(colour = "grey98", size = 0.5)
+    axis.title = element_text(
+      size = 16,
+      face = "bold",
+      colour = "black"
+    ),
+    
+    axis.text.x = element_text(
+      size = 12,
+      face = "bold",
+      colour = "black"
+    ),
+    
+    axis.text.y = element_text(
+      size = 15,
+      face = "bold",
+      colour = "black"
+    ),
+    
+    panel.grid.major = element_line(
+      colour = "grey90",
+      linewidth = 0.4
+    ),
+    
+    panel.grid.minor = element_line(
+      colour = "grey96",
+      linewidth = 0.2
+    ),
+    
+    panel.border = element_rect(
+      colour = "black",
+      linewidth = 0.8
+    ),
+    
+    legend.position = "none"
   )
 
+
 print(p)
-ggsave((paste0("absolutediff", ".png")), width=10, height=7, dpi=300)
+         
+ggsave(
+  "absolute_difference.tiff",
+  plot = p,
+  width = 10,  
+  height = 7,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+
+
