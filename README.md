@@ -20,6 +20,7 @@ The analyses use multiple data sources including:
 - MODIS NDVI
 - Landsat-derived land surface temperature
 - Health facility reporting completeness indicator
+- Total outpatient attendance at health facility
 
 Data from routine HMIS/DHIS2 are not publicly available and were obtained with request from the National Malaria Control Programme of mainland Tanzania. Restrictions apply to the availability of these data and permission can be obtained with reasonable request from the Ministry of Health of mainland Tanzania. Therefore, this repository does not contain the raw surveillance data.
 
