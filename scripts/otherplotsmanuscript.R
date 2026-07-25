@@ -421,3 +421,131 @@ ggsave(
   compression = "lzw",
   bg = "white"
 )
+
+#-------------------------------
+#Figure 2
+#-------------------------------
+out_file      <- "Fig 2.tif"
+img_width_in  <- 6.5
+img_res       <- 300   # dpi
+
+# ---- Box content: header (bold) lines + stat (regular) lines, per box ----
+boxes <- list(
+  list(header = c("Councils receiving LLIN campaign (2020)"),
+       stats  = c("N_councils =50", "N_facilities = 2,493", "N_reports= 179,484")),
+  list(header = c("Facilities performing mRDT testing"),
+       stats  = c("N_councils =50", "N_facilities = 2,493", "N_reports= 139,739")),
+  list(header = c("Included after reporting completeness threshold (\u226575%) per year & across analysis period"),
+       stats  = c("N_councils =49", "N_facilities = 1,603", "N_reports= 105,649")),
+  list(header = c("Excluded facilities with >3 consecutive months of missing reports"),
+       stats  = c("N_councils =49", "N_facilities = 1,502", "N_reports= 104,487")),
+  list(header = c("Excluded facility reports having extreme outliers"),
+       stats  = c("N_councils =49", "N_facilities = 1,502", "N_reports= 99,912")),
+  list(header = c("Excluded district with data from only one facility"),
+       stats  = c("N_councils =48", "N_facilities = 1,501", "N_reports= 99, 857"))
+)
+n_boxes <- length(boxes)
+
+# ---- Style ----
+cex_txt   <- 0.95
+margin_lr <- 0.35   # in
+margin_tb <- 0.30   # in
+box_w_in  <- img_width_in - 2 * margin_lr
+gap_in    <- 0.40   # vertical space between boxes (room for the arrow)
+line_h_in <- 0.26   # vertical space allotted per text line
+pad_in    <- 0.16   # padding above/below the text block inside each box
+
+x_left  <- margin_lr
+x_right <- margin_lr + box_w_in
+x_mid   <- (x_left + x_right) / 2
+text_width_avail_in <- box_w_in * 0.92
+
+# ---- Open a throwaway device purely to measure text in real inches ----
+# (cairo_pdf is Unicode-safe, unlike the default pdf() device, so the
+#  '\u2265' symbol in box 3 measures correctly)
+cairo_pdf(tempfile(fileext = ".pdf"))
+par(mar = c(0, 0, 0, 0))
+plot.new()
+plot.window(xlim = c(0, 1), ylim = c(0, 1))
+
+wrap_header <- function(txt, width_avail_in, cex) {
+  if (strwidth(txt, units = "inches", cex = cex, font = 2) <= width_avail_in) {
+    return(txt)
+  }
+  words <- strsplit(txt, " ")[[1]]
+  lines <- c(); cur <- ""
+  for (w in words) {
+    trial <- if (cur == "") w else paste(cur, w)
+    if (strwidth(trial, units = "inches", cex = cex, font = 2) <= width_avail_in) {
+      cur <- trial
+    } else {
+      lines <- c(lines, cur); cur <- w
+    }
+  }
+  c(lines, cur)
+}
+
+box_lines  <- list()
+box_h_in   <- numeric(n_boxes)
+
+for (i in seq_len(n_boxes)) {
+  hdr_wrapped <- unlist(lapply(boxes[[i]]$header, wrap_header,
+                               width_avail_in = text_width_avail_in, cex = cex_txt))
+  all_lines <- c(hdr_wrapped, boxes[[i]]$stats)
+  is_bold   <- c(rep(TRUE, length(hdr_wrapped)), rep(FALSE, length(boxes[[i]]$stats)))
+  box_lines[[i]] <- list(text = all_lines, bold = is_bold)
+  box_h_in[i]    <- length(all_lines) * line_h_in + 2 * pad_in
+}
+dev.off()  # close the measuring device
+
+# ---- Compute vertical position (in inches, measured from the TOP) of every box ----
+top_of_box    <- numeric(n_boxes)
+bottom_of_box <- numeric(n_boxes)
+top_of_box[1] <- margin_tb
+bottom_of_box[1] <- top_of_box[1] + box_h_in[1]
+for (i in 2:n_boxes) {
+  top_of_box[i]    <- bottom_of_box[i - 1] + gap_in
+  bottom_of_box[i] <- top_of_box[i] + box_h_in[i]
+}
+
+img_height_in <- bottom_of_box[n_boxes] + margin_tb
+
+# ---- Open the real TIFF device sized exactly to fit the content ----
+tiff(filename = out_file,
+     width = img_width_in, height = img_height_in,
+     units = "in", res = img_res, compression = "lzw")
+
+par(mar = c(0, 0, 0, 0))
+plot.new()
+# y-axis: 0 at TOP of image, growing downward, in inches -> flip for plot.window
+plot.window(xlim = c(0, img_width_in), ylim = c(img_height_in, 0), xaxs = "i", yaxs = "i")
+rect(0, 0, img_width_in, img_height_in, col = "white", border = NA)
+
+for (i in seq_len(n_boxes)) {
+  
+  if (i > 1) {
+    arrows(x0 = x_mid, y0 = bottom_of_box[i - 1],
+           x1 = x_mid, y1 = top_of_box[i],
+           length = 0.09, angle = 25, lwd = 1.6, col = "black")
+  }
+  
+  rect(x_left, top_of_box[i], x_right, bottom_of_box[i],
+       col = "white", border = "black", lwd = 1.3)
+  
+  lines_i <- box_lines[[i]]$text
+  bold_i  <- box_lines[[i]]$bold
+  n_lines <- length(lines_i)
+  
+  y_text_top <- top_of_box[i] + pad_in + line_h_in * 0.65
+  
+  for (j in seq_len(n_lines)) {
+    y_pos <- y_text_top + (j - 1) * line_h_in
+    text(x_mid, y_pos, labels = lines_i[j],
+         cex = cex_txt,
+         font = if (bold_i[j]) 2 else 1,
+         family = "sans")
+  }
+}
+
+dev.off()
+cat("Saved:", normalizePath(out_file), " | dimensions (in):", img_width_in, "x", img_height_in, "\n")
